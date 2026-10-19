@@ -35,6 +35,22 @@ is the developer feedback loop.
 | `asentum-explorer-2-source-hash-mismatch.md` | Issue body — `asentum-explorer` |
 | `runtime-telegram-post.md` | Telegram message (reports 1–3 in one post) |
 
+## Submitted
+
+| # | Report | Status | Link |
+|---|--------|--------|------|
+| 4 | SDK view endpoint | ✅ posted | https://github.com/asentum-network/asentum-connect/issues/3 |
+| 5 | `requestFaucet()` 403 | ✅ posted | https://github.com/asentum-network/asentum-connect/issues/4 |
+| 6 | Two incompatible SDK APIs | ✅ posted | https://github.com/asentum-network/asentum-connect/issues/5 |
+| 7 | `asentum_getContractHash` missing | ✅ posted | https://github.com/asentum-network/asentum-explorer/issues/46 |
+| 8 | Source / hash normalisation | ✅ posted | https://github.com/asentum-network/asentum-explorer/issues/47 |
+| 1 | `msg.block.number` undefined | ⬜ **TODO** — Telegram (`t.me/asentum`) + X DM @jst_Smiles | — |
+| 2 | Both documented contract formats fail | ⬜ **TODO** — Telegram + X DM | — |
+| 3 | `storage.get()` returns raw string | ⬜ **TODO** — Telegram + X DM | — |
+
+Posts were created with `create-issues.py`. It checks existing titles first,
+so re-running it will not double-post.
+
 ## Before you post
 
 Each body opens with a bold one-line summary. Paste the **title** from the
