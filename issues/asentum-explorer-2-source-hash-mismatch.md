@@ -36,6 +36,22 @@ alongside it hashes to something else, and no doc says which normalisation
 (strip trailing newline, normalise line endings, BOM handling) the explorer
 applies before display.
 
+There is also no reachable endpoint that returns the digest directly. The
+following were all probed against `https://explorer.asentum.com`:
+
+```
+POST /            (JSON-RPC)            -> {"error":{"code":-32601,"message":"method not found: asentum_getContractHash"}}
+GET  /api/contract/<addr>               -> 404
+GET  /rpc/contract/<addr>               -> 404 {"error":"not found","method":"GET","path":"/contract/<addr>"}
+GET  /contracts/<addr>                  -> 404
+```
+
+The contract page itself is client-rendered, so the digest is not present in
+the served HTML either. In other words, the documented workflow
+(`asentum_getContractHash` -> compare with `b3sum`) has no working first
+step, and the fallback (hash the served source) requires knowing an
+undocumented normalisation rule.
+
 ### Reproduction
 
 ```bash
