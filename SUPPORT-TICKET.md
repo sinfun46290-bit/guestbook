@@ -1,217 +1,103 @@
-# Support ticket — runtime API ground truth (correction + probe results)
+# Support ticket — runtime API ground truth
 
-**Portal:** https://support.asentum.com → "Open a ticket" (sign in required)
-**Reply to:** in the ticket thread, and via email if you opt in
+**URL:** https://support.asentum.com/new  (sign in first — Google / Apple / Asentum wallet)
+**Character limit:** 6,000 on the "What" field. The body below is ~5,700.
 
----
-
-## Title
-
-`Runtime API ground truth — probe results for 6 disputed/undocumented APIs (correction to my #devlog post)`
-
----
-
-## Body (copy from here)
-
-Follow-up to my earlier `#devlog` post. I deployed a probe contract to establish
-ground truth for the APIs that post and the docs disagree on. Two corrections
-and one upgraded severity, plus four new findings.
-
-**Correction 1 — I was wrong about timestamps.** My earlier post said there
-"appears to be no timestamp primitive at all." There is one: `chain.blockTimestamp`.
-It returns a BigInt in **milliseconds** (`1792442587086n`), not the seconds the
-`msg.block.timestamp` docs imply. `chain.timestamp` — the property the
-developers page uses in its own code sample — does not exist.
-
-**Correction 2 — the storage finding is worse than I described it.** I said
-`storage.get()` returns the raw stored string. Correct, but the consequence is
-silent corruption, not a type annoyance. Details below.
-
-**The `msg.block` finding from the original post stands.** `msg.block` is
-`undefined`; `msg.block.number` and `msg.block.timestamp` both throw
-`Cannot read properties of undefined`.
+**Field mapping**
+| Field | Value |
+|---|---|
+| **What** | body below |
+| **Product** | closest match (Node / Wallet / Other) |
+| **Ethereum wallet** | `0x702d…7203` (the one linked on the airdrop dashboard) |
+| **Asentum address** | `ase1v2zm5cnw0hkl5mcudlc9cxyaqhhqm0w4d8z774` |
 
 ---
 
-### Probe contract
+## Body (copy from here — 5,700 chars)
 
-Deployed at `ase18s2ka546638c7s0rhkhan5wy3q7x77a632f3ek`.
-Source is readable on-chain via `eth_getCode` — the probe is independently
-verifiable without trusting this ticket. It has 8 view methods, each returning
-a per-call `{ api: "OK type=... value=..." | "ERR <message>" }` map so a
-failure in one probe does not abort the others.
+Follow-up to my earlier `#devlog` post. I deployed a probe contract to establish ground truth for the APIs the docs disagree on. Two corrections, one upgraded severity, four new findings.
 
-```bash
-curl -s -X POST https://testnet.asentum.com/view \
-  -H 'Content-Type: application/json' \
-  -d '{"contract":"ase18s2ka546638c7s0rhkhan5wy3q7x77a632f3ek","method":"probeStorageRoundTrip","args":[]}'
-```
+**Correction 1 — I was wrong about timestamps.** I said there "appears to be no timestamp primitive at all." There is: `chain.blockTimestamp`. It returns a BigInt in **milliseconds** (`1792442587086n`), not the seconds `msg.block.timestamp` implies. `chain.timestamp` — used in the developers page's own code sample — does not exist.
 
----
+**Correction 2 — the storage finding is worse than I described.** `storage.get()` does return a raw string, but the consequence is silent value corruption, not a type annoyance.
 
-### Finding A — `storage` coerces every value to a string on write (severity: high)
+**The `msg.block` finding stands.** `msg.block` is `undefined`; `msg.block.number` and `msg.block.timestamp` both throw.
 
-The storage API docs say:
+### A. `storage` stringifies every value on write — BigInt arithmetic silently concatenates
 
-> Keys are strings, values are anything JSON-serializable (including `BigInt`
-> and nested objects).
+Docs say: *"Keys are strings, values are anything JSON-serializable (including `BigInt` and nested objects)."* Measured round-trip:
 
-Measured round-trip through `storage.set` → `storage.get`:
+| Written | `storage.get()` returns |
+|---|---|
+| `42` | `"42"` |
+| `true` | `"true"` |
+| `[1,2,3]` | `"1,2,3"` (not JSON) |
+| `{a:1,b:'two'}` | `"[object Object]"` (value destroyed) |
+| `7n` | `"7"` |
 
-| Written | `storage.get()` returns | `typeof` |
-|---|---|---|
-| `42` | `"42"` | `string` |
-| `true` | `"true"` | `string` |
-| `[1, 2, 3]` | `"1,2,3"` | `string` |
-| `{ a: 1, b: 'two' }` | `"[object Object]"` | `string` |
-| `7n` | `"7"` | `string` |
+Objects are destroyed on write, not just unreadable — `storage.get('p_obj').b` is `undefined`. Arrays are `Array.toString`, not JSON, so the `JSON.parse(storage.get(k))` pattern throws on a raw array.
 
-Three consequences:
-
-**1. Objects are destroyed on write.** `{ a: 1, b: 'two' }` becomes the literal
-string `"[object Object]"`. The value is not merely unreadable — it is gone.
-`storage.get('p_obj').b` returns `undefined`.
-
-**2. Arrays are not JSON.** `[1, 2, 3]` becomes `"1,2,3"` — `Array.prototype.toString`,
-not `JSON.stringify`. So the `JSON.parse(storage.get(k))` pattern that works
-around this (and which the on-chain governance contract uses) will **throw** on
-a value written as a raw array.
-
-**3. BigInt arithmetic silently concatenates.**
+The dangerous part:
 
 ```javascript
 storage.set('p_big', 7n);
-storage.get('p_big')       // "7"   (string)
-storage.get('p_big') + 1n  // "71"  (string concat — NOT 8n)
+storage.get('p_big')       // "7"
+storage.get('p_big') + 1n  // "71"  (string concat, NOT 8n)
 ```
 
-This is the dangerous one. It does not revert, does not throw, does not emit an
-event. A balance of `"100"` incremented by `1n` becomes `"1001"`. A counter at
-`"9"` becomes `"91"`. A contract that reads a stored amount and adds to it
-computes a wrong number and carries on. Any contract following the docs' "use
-BigInt for every token balance, amount, nonce" advice is exposed to this,
-because the round-trip through storage silently un-types the value.
+No revert, no throw, no event. A stored balance of `"100"` incremented by `1n` becomes `"1001"`. A counter at `"9"` becomes `"91"`. The contract computes a wrong number and carries on. The docs tell developers to use BigInt for exactly these values, and the round-trip silently un-types them.
 
-**Affects the developers page example directly.** `asentum.com/developers`
-shows:
-
+This also breaks the developers page example directly:
 ```javascript
-storage.set('sub:' + msg.sender, {
-  amount:     amountPerWeek,
-  nextCharge: chain.timestamp + 7 * 86400,
-});
+storage.set('sub:' + msg.sender, { amount, nextCharge: chain.timestamp + 7*86400 });
 ```
+The object is written as `"[object Object]"` (data lost) and `chain.timestamp` is `undefined` (throws). `storage.entries('sub:')` in the same example is also not a function.
 
-Both halves of that line are wrong against the runtime: the object is written as
-`"[object Object]"` (data lost), and `chain.timestamp` is `undefined` (throws).
-`storage.entries('sub:')` in the same example is also not a function.
+**Fix:** either make storage type-preserving (serialise with a type tag, deserialise on read) or state the string behaviour prominently — including that `+` on a stored BigInt concatenates. The current wording is the opposite of runtime behaviour and is dangerous for balances.
 
-**Suggested fix.** Either (a) make storage type-preserving — serialise on write
-with a type tag and deserialise on read, so `BigInt` survives and objects round
-trip, or (b) keep the string behaviour but change the docs to state it
-explicitly and prominently, including that `+` on a stored BigInt concatenates.
-
-Either way the current wording — "values are anything JSON-serializable
-(including BigInt and nested objects)" — needs to change. It is the opposite of
-what the runtime does, and it is the kind of thing that costs a token balance.
-
----
-
-### Finding B — `storage.entries()` does not exist; `storage.keys()` does (undocumented)
-
-`asentum.com/developers` uses `storage.entries('sub:')` to iterate a prefix.
+### B. `storage.entries()` doesn't exist; `storage.keys()` does (undocumented)
 
 ```
 storage.entries        → undefined
 storage.entries('p_')  → ERR "storage.entries is not a function"
-storage.entries()      → ERR "storage.entries is not a function"
+storage.keys()         → ["p_arr","p_big","p_bool","p_num","p_obj","p_str"]
 ```
+`storage.keys()` works and is the only iteration primitive I could get to work, but it appears in **no** documentation I could find. Please document it.
 
-But `storage.keys()` works and returns a `string[]` of every key in the
-contract:
-
-```
-storage.keys() → ["p_arr","p_big","p_bool","p_num","p_obj","p_str"]
-```
-
-`storage.keys()` appears in **no** documentation I could find — not the Writing
-Contracts guide, not the Hardened JavaScript guide, not the developers page.
-It is the only way to iterate storage that I could get to work, so please
-document it.
-
----
-
-### Finding C — `this` is undefined inside contract methods
+### C. `this` is undefined inside contract methods
 
 ```
-typeof this        → "undefined"
-this.address       → ERR "Cannot read properties of undefined (reading 'address')"
-Object.keys(this)  → ERR "Cannot convert undefined or null to object"
+typeof this       → "undefined"
+this.address      → ERR "Cannot read properties of undefined (reading 'address')"
 ```
+The developers page uses `this.address` in its cron example. There is no `this` binding.
 
-The developers page uses `this.address` in the cron example. There is no `this`
-binding. If contracts are meant to expose their own address, that needs to be
-documented and implemented; if not, the example should be corrected.
+### D. `cron` is not an injected global
 
----
-
-### Finding D — `cron` is not an injected global
-
-The developers page shows `cron.schedule(this.address, 'chargeAll', '@daily')`
-as the "native cron" primitive, and the IDE has a Cron tab. But the complete
-set of injected globals is:
+Developers page: `cron.schedule(this.address, 'chargeAll', '@daily')`. But the complete injected-globals list is:
 
 ```
 Object.keys(globalThis) → ["E","assert","chain","emit","msg","storage","transfer"]
 ```
 
-`cron` is not in it, and `typeof cron` is `undefined`. The Hardened JavaScript
-guide lists the injected globals as "storage, emit, msg, E, transfer" — which
-omits `chain` and `assert`, both of which do exist.
+`cron` is not in it, and `typeof cron` is `undefined`. The Hardened JavaScript guide lists the globals as "storage, emit, msg, E, transfer" — omitting `chain` and `assert`, both of which exist. So the list is wrong in both directions. If cron is scheduled some other way (CLI, Vault worker, IDE action), please document that route — the only documented way to schedule a call is a snippet that throws.
 
-So the globals list is wrong in two directions: `chain` and `assert` are
-missing from the docs, and `cron` is documented but absent. If cron is
-scheduled through a different mechanism (a CLI call, a Vault worker, an IDE
-action), please document that route — right now the only documented way to
-schedule a call is a snippet that throws.
-
----
-
-### Finding E — `chain.blockTimestamp` is milliseconds, and `chain.timestamp` is undefined
+### E. `chain.blockTimestamp` is milliseconds
 
 ```
-chain.blockNumber     → bigint 553046n
-chain.blockTimestamp  → bigint 1792442587086n   // milliseconds
-chain.chainId         → bigint 1423n
-chain.timestamp       → undefined
-chain.block           → undefined
+chain.blockNumber    → bigint 553046n
+chain.blockTimestamp → bigint 1792442587086n   // milliseconds
+chain.chainId        → bigint 1423n
+chain.timestamp      → undefined
+chain.block          → undefined
 ```
+If `chain.blockTimestamp` is the intended replacement for `msg.block.timestamp`, the unit needs stating: `chain.blockTimestamp + 7*86400` is ~7 seconds, not 7 days.
 
-`1792442587086` is a millisecond epoch. The `msg.block.timestamp` docs describe
-"current block time (unix seconds)", and the developers page does
-`chain.timestamp + 7 * 86400` — which assumes seconds. If `chain.blockTimestamp`
-is the intended replacement, the unit needs to be stated, because
-`chain.blockTimestamp + 7 * 86400` is roughly seven seconds, not seven days.
+### F. `assert` and `throw` both work
 
----
+`assert(1===2,'assert fired')` → reverts "assert fired". `throw new Error('throw fired')` → reverts "throw fired". Minor: `assert('truthy','msg')` does **not** fire — the condition isn't coerced to boolean. Worth documenting.
 
-### Finding F — `assert` works; `throw` also works
-
-Both revert with the message, confirmed:
-
-```
-assert(1 === 1, 'never')      → no revert
-assert(1 === 2, 'assert fired') → ERR "assert fired"
-throw new Error('throw fired') → ERR "throw fired"
-```
-
-Minor note: `assert('truthy', 'msg')` does not fire — the condition is not
-coerced to a boolean. Worth documenting as a gotcha so nobody relies on a
-truthy non-boolean passing.
-
----
-
-### Summary of what is documented where
+### Docs vs runtime summary
 
 | API | Writing Contracts | Hardened JS | Developers page | Runtime |
 |---|---|---|---|---|
@@ -219,84 +105,55 @@ truthy non-boolean passing.
 | `msg.block.timestamp` | documented | documented | — | **undefined** |
 | `chain.blockNumber` | — | — | documented | ✅ |
 | `chain.blockTimestamp` | — | — | documented | ✅ (ms) |
-| `chain.timestamp` | — | — | used in sample | **undefined** |
+| `chain.timestamp` | — | — | in sample | **undefined** |
 | `chain.chainId` | — | — | documented | ✅ |
 | `cron` | — | — | documented | **not a global** |
-| `this.address` | — | — | used in sample | **undefined** |
-| `storage.entries()` | — | — | used in sample | **not a function** |
+| `this.address` | — | — | in sample | **undefined** |
+| `storage.entries()` | — | — | in sample | **not a function** |
 | `storage.keys()` | — | — | — | ✅ (undocumented) |
 | `assert` | — | — | documented | ✅ |
-| object round-trip | "nested objects" | — | shown in sample | **"[object Object]"** |
-| BigInt round-trip | "including BigInt" | "use BigInt for balances" | — | **string; `+` concatenates** |
+| object round-trip | "nested objects" | — | in sample | **"[object Object]"** |
+| BigInt round-trip | "including BigInt" | "BigInt for balances" | — | **string; `+` concatenates** |
 | contract shape | top-level functions | — | — | **object literal required** |
 
-Four pages, four different pictures of the same API. The contract-shape issue
-from my original post still stands and is the one that blocks a first-time
-developer hardest: neither documented format runs.
+Four pages, four different pictures of one API. The contract-shape issue from my original post still stands and blocks first-time developers hardest — neither documented format runs.
 
----
+### Probe contract
 
-### Also filed on GitHub (SDK + explorer, not the VM)
-
-- `asentum-network/asentum-connect` #3, #4, #5
-- `asentum-network/asentum-explorer` #46, #47
-
-Per the Security Best Practices page I have emailed `security@asentum.com` as
-well, and I am happy to pull any of the public issues if you would rather they
-were private.
-
----
-
-### Reproduction
-
-Everything above is a `view` call against the probe contract, no gas, no wallet:
+`ase18s2ka546638c7s0rhkhan5wy3q7x77a632f3ek` — source readable on-chain via `eth_getCode`, so this is independently verifiable without trusting the ticket. 8 view methods, each returning a per-call `OK type=… value=…` / `ERR …` map so one failure doesn't abort the rest.
 
 ```bash
 curl -s -X POST https://testnet.asentum.com/view \
   -H 'Content-Type: application/json' \
   -d '{"contract":"ase18s2ka546638c7s0rhkhan5wy3q7x77a632f3ek","method":"probeStorageRoundTrip","args":[]}'
 ```
+Also: `probeChain`, `probeMsg`, `probeStorageEntries`, `probeThis`, `probeGlobals`, `probeAssertVsThrow`, `probeIteration` — all views, no gas.
 
-`probeChain`, `probeMsg`, `probeStorageEntries`, `probeThis`, `probeGlobals`,
-`probeAssertVsThrow` and `probeIteration` are all views on the same contract.
+### Also filed on GitHub (SDK + explorer, not the VM)
 
-Happy to send the probe source as a file, or to walk through any of it live.
+- `asentum-network/asentum-connect` #3, #4, #5
+- `asentum-network/asentum-explorer` #46, #47
 
----
+Per the Security Best Practices page I have emailed `security@asentum.com` as well, and I'm happy to pull the public issues if you prefer them private.
 
-## Suggested fixes, in priority order
+### Fix priority
 
-1. **`storage` type preservation.** Either make the round-trip type-safe, or
-   state the string behaviour prominently in the docs — and say that `+` on a
-   stored BigInt concatenates. The current wording is actively dangerous for
-   balances.
-2. **Fix `asentum.com/developers`.** The cron, `this.address`,
-   `storage.entries()` and `chain.timestamp` snippets all throw as written.
-   That page is the first thing a new builder reads.
-3. **Document `storage.keys()`.** It works and it is the only iteration
-   primitive I could find.
-4. **One canonical contract format.** The object-literal form works. Neither
-   guide shows it. The IDE parser only recognises that shape, which is how I
-   found it.
-5. **Fix the globals list.** `chain` and `assert` are missing from the
-   Hardened JavaScript guide; `cron` is documented but absent.
-6. **State the timestamp unit.** `chain.blockTimestamp` is milliseconds.
+1. **`storage` type preservation** — or state the string behaviour and the `+` concatenation hazard.
+2. **Fix `asentum.com/developers`** — cron, `this.address`, `storage.entries()`, `chain.timestamp` all throw as written. That page is the first thing a new builder reads.
+3. **Document `storage.keys()`.**
+4. **One canonical contract format** — the object-literal form works, neither guide shows it.
+5. **Fix the globals list** — `chain` and `assert` missing; `cron` documented but absent.
+6. **State the timestamp unit.**
+
+Happy to send the probe source as a file, or walk through any of it live.
 
 ---
 
-## Before you send — optional extras
+## Fallback: email
 
-If you also want to apply for the **Airdrop Ecosystem Program** in the same
-ticket (it says "Open a ticket in the support panel"), add:
+If sign-in is a hassle, the FAQ sanctions this directly:
 
-1. Project name and domain
-2. Telegram username (required)
-3. Short description
-4. Contract addresses (`ase1...`)
-5. Actions you want turned into tasks
-6. X account
+> "Still stuck? Email **hello@asentum.com** or file an issue on GitHub. We'd rather help you now than have you work around it."
 
-⚠️ The program requires **your own domain on a TLD/ccTLD** — it explicitly
-does not accept `*.github.io` or `*.vercel.app`. My guestbook dApp is currently
-on GitHub Pages, so I need a real domain before I can apply. I will reply in
-this ticket once I have one.
+Subject: `Runtime API ground truth — probe results for 6 disputed/undocumented APIs`
+Body: same as above. `SECURITY-EMAIL.md` in this repo is a shorter, security-framed version for `security@asentum.com` (cc `hello@asentum.com`).
