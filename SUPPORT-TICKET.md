@@ -21,9 +21,7 @@ Follow-up to my earlier `#devlog` post. I deployed a probe contract to establish
 
 **Correction 2 — the storage finding is worse than I described.** `storage.get()` does return a raw string, but the consequence is silent value corruption, not a type annoyance.
 
-**The `msg.block` finding stands.** `msg.block` is `undefined`; `msg.block.number` and `msg.block.timestamp` both throw.
-
-### A. `storage` stringifies every value on write — BigInt arithmetic silently concatenates
+**The `msg.block` finding stands.** `msg.block` is `undefined`; `msg.block.number` and `msg.block.timestamp` both throw.### A. `storage` stringifies every value on write — BigInt arithmetic silently concatenates
 
 Docs say: *"Keys are strings, values are anything JSON-serializable (including `BigInt` and nested objects)."* Measured round-trip:
 
@@ -47,11 +45,7 @@ storage.get('p_big') + 1n  // "71"  (string concat, NOT 8n)
 
 No revert, no throw, no event. A stored balance of `"100"` incremented by `1n` becomes `"1001"`. A counter at `"9"` becomes `"91"`. The contract computes a wrong number and carries on. The docs tell developers to use BigInt for exactly these values, and the round-trip silently un-types them.
 
-This also breaks the developers page example directly:
-```javascript
-storage.set('sub:' + msg.sender, { amount, nextCharge: chain.timestamp + 7*86400 });
-```
-The object is written as `"[object Object]"` (data lost) and `chain.timestamp` is `undefined` (throws). `storage.entries('sub:')` in the same example is also not a function.
+This also breaks the developers page example directly — `storage.set('sub:'+msg.sender, { amount, nextCharge: chain.timestamp + 7*86400 })` writes the object as `"[object Object]"` (data lost) and throws on `chain.timestamp`; `storage.entries('sub:')` in the same example is also not a function.
 
 **Fix:** either make storage type-preserving (serialise with a type tag, deserialise on read) or state the string behaviour prominently — including that `+` on a stored BigInt concatenates. The current wording is the opposite of runtime behaviour and is dangerous for balances.
 
@@ -80,7 +74,7 @@ Developers page: `cron.schedule(this.address, 'chargeAll', '@daily')`. But the c
 Object.keys(globalThis) → ["E","assert","chain","emit","msg","storage","transfer"]
 ```
 
-`cron` is not in it, and `typeof cron` is `undefined`. The Hardened JavaScript guide lists the globals as "storage, emit, msg, E, transfer" — omitting `chain` and `assert`, both of which exist. So the list is wrong in both directions. If cron is scheduled some other way (CLI, Vault worker, IDE action), please document that route — the only documented way to schedule a call is a snippet that throws.
+`cron` is not in it, and `typeof cron` is `undefined`. The Hardened JavaScript guide lists the globals as "storage, emit, msg, E, transfer" — omitting `chain` and `assert`, both of which exist. If cron is scheduled some other way (CLI, Vault worker, IDE action), please document that route — the only documented way to schedule a call is a snippet that throws.
 
 ### E. `chain.blockTimestamp` is milliseconds
 
@@ -89,50 +83,35 @@ chain.blockNumber    → bigint 553046n
 chain.blockTimestamp → bigint 1792442587086n   // milliseconds
 chain.chainId        → bigint 1423n
 chain.timestamp      → undefined
-chain.block          → undefined
 ```
-If `chain.blockTimestamp` is the intended replacement for `msg.block.timestamp`, the unit needs stating: `chain.blockTimestamp + 7*86400` is ~7 seconds, not 7 days.
-
-### F. `assert` and `throw` both work
-
-`assert(1===2,'assert fired')` reverts "assert fired"; `throw new Error('throw fired')` reverts "throw fired". Minor: `assert('truthy','msg')` does **not** fire — the condition isn't coerced to boolean. Worth documenting.
+If `chain.blockTimestamp` is the intended replacement for `msg.block.timestamp`, the unit needs stating: `chain.blockTimestamp + 7*86400` is ~7 seconds, not 7 days. `assert` and `throw` both work and revert with their message; minor gotcha — `assert('truthy','msg')` does **not** fire, the condition isn't coerced to boolean.
 
 ### Docs vs runtime
 
-Documented but absent at runtime: `msg.block.number`, `msg.block.timestamp`, `chain.timestamp`, `cron`, `this.address`, `storage.entries()`.
-Present at runtime but undocumented: `chain` (blockNumber, blockTimestamp, chainId), `assert`, `storage.keys()`.
-Documented but behaves differently: object values → `"[object Object]"`; BigInt → string, and `+` concatenates; contract shape → object literal required, not top-level functions.
+Absent at runtime despite being documented: `msg.block.number`, `msg.block.timestamp`, `chain.timestamp`, `cron`, `this.address`, `storage.entries()`. Present at runtime but undocumented: `chain` (blockNumber/blockTimestamp/chainId), `assert`, `storage.keys()`. Documented but different: objects → `"[object Object]"`, BigInt → string with `+` concatenating, contract shape → object literal required.
 
-Four pages, four different pictures of one API. The contract-shape issue from my original post still stands and blocks first-time developers hardest — neither documented format runs.
+Four pages, four pictures of one API. The contract-shape issue from my original post still stands and blocks first-time developers hardest — neither documented format runs.
 
 ### Probe contract
 
-`ase18s2ka546638c7s0rhkhan5wy3q7x77a632f3ek` — source readable on-chain via `eth_getCode`, so this is independently verifiable without trusting the ticket. 8 view methods, each returning a per-call `OK type=… value=…` / `ERR …` map so one failure doesn't abort the rest.
+`ase18s2ka546638c7s0rhkhan5wy3q7x77a632f3ek` — source readable on-chain via `eth_getCode`, so this is independently verifiable without trusting the ticket. 8 free view methods, each returning a per-call `OK type=… value=…` / `ERR …` map so one failure doesn't abort the rest: `probeChain`, `probeMsg`, `probeStorageRoundTrip`, `probeStorageEntries`, `probeThis`, `probeGlobals`, `probeAssertVsThrow`, `probeIteration`.
 
-```bash
-curl -s -X POST https://testnet.asentum.com/view \
-  -H 'Content-Type: application/json' \
-  -d '{"contract":"ase18s2ka546638c7s0rhkhan5wy3q7x77a632f3ek","method":"probeStorageRoundTrip","args":[]}'
 ```
-Also: `probeChain`, `probeMsg`, `probeStorageEntries`, `probeThis`, `probeGlobals`, `probeAssertVsThrow`, `probeIteration` — all views, no gas.
+POST https://testnet.asentum.com/view
+{"contract":"ase18s2ka546638c7s0rhkhan5wy3q7x77a632f3ek","method":"probeStorageRoundTrip","args":[]}
+```
 
 ### Also filed on GitHub (SDK + explorer, not the VM)
 
-- `asentum-network/asentum-connect` #3, #4, #5
-- `asentum-network/asentum-explorer` #46, #47
-
-Per the Security Best Practices page I have emailed `security@asentum.com` as well, and I'm happy to pull the public issues if you prefer them private.
+`asentum-network/asentum-connect` #3, #4, #5 · `asentum-network/asentum-explorer` #46, #47. Per the Security Best Practices page I have emailed `security@asentum.com` as well, and I'm happy to pull the public issues if you prefer them private.
 
 ### Fix priority
 
 1. **`storage` type preservation** — or state the string behaviour and the `+` concatenation hazard.
 2. **Fix `asentum.com/developers`** — cron, `this.address`, `storage.entries()`, `chain.timestamp` all throw as written. That page is the first thing a new builder reads.
-3. **Document `storage.keys()`.**
-4. **One canonical contract format** — the object-literal form works, neither guide shows it.
-5. **Fix the globals list** — `chain` and `assert` missing; `cron` documented but absent.
-6. **State the timestamp unit.**
+3. **Document `storage.keys()`; one canonical contract format; fix the globals list; state the timestamp unit.**
 
-Happy to send the probe source as a file, or walk through any of it live.
+Happy to send the probe source, or walk through any of it live.
 
 ---
 
