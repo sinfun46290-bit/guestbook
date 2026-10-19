@@ -1,0 +1,19 @@
+{
+  "name": "asentum-guestbook",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "On-chain guestbook dApp for the Asentum L1 (testnet)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173"
+  },
+  "dependencies": {
+    "@asentum/connect": "^0.1.9",
+    "@asentum/sdk": "^0.1.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4"
+  }
+}

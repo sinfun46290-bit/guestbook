@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Asentum Guestbook</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0a;
+      --card: #161616;
+      --border: #2a2a2a;
+      --text: #e8e8e8;
+      --muted: #7a7a7a;
+      --accent: #7c7cff;
+      --like: #ff5c7a;
+    }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 48px 20px 80px;
+      line-height: 1.5;
+    }
+    header { margin-bottom: 32px; }
+    h1 {
+      font-size: 28px;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+    .subtitle { color: var(--muted); font-size: 14px; }
+    .subtitle a { color: var(--accent); text-decoration: none; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h3 { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+    .status { font-size: 13px; min-height: 20px; display: inline-block; }
+    .status.ok { color: #34d17a; }
+    .status.err { color: #ff6b6b; }
+    .status.info { color: var(--muted); }
+    input, textarea {
+      width: 100%;
+      padding: 11px 13px;
+      margin-bottom: 10px;
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 70px; }
+    button {
+      padding: 10px 18px;
+      background: #232323;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 14px;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    button:hover:not(:disabled) { background: #2e2e2e; border-color: #555; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500; }
+    button.primary:hover:not(:disabled) { background: #6a6aff; border-color: #6a6aff; }
+    button.ghost { background: transparent; border-color: var(--border); color: var(--muted); }
+    button.ghost:hover:not(:disabled) { color: var(--text); border-color: #555; }
+    button.like {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 13px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    button.like:hover:not(:disabled) { border-color: var(--like); color: var(--like); }
+    button.like.on { border-color: var(--like); color: var(--like); background: rgba(255,92,122,0.08); }
+    .entry { padding: 16px 0; border-bottom: 1px solid #1e1e1e; }
+    .entry:last-child { border-bottom: none; }
+    .entry:first-child { padding-top: 4px; }
+    .entry-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .entry-id { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .entry-name { font-weight: 600; color: var(--accent); }
+    .entry-signer { font-size: 11px; color: #555; font-family: ui-monospace, monospace; }
+    .entry-msg { margin: 8px 0 6px; font-size: 15px; word-break: break-word; }
+    .entry-meta { font-size: 11px; color: #4a4a4a; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+    .tab {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 16px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .tab:hover { color: var(--text); border-color: #444; }
+    .tab.on { background: #23232b; border-color: var(--accent); color: var(--text); }
+    .rank-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 0; border-bottom: 1px solid #1e1e1e; font-size: 14px; gap: 12px;
+    }
+    .rank-row:last-child { border-bottom: none; }
+    .rank-no { color: #555; font-size: 12px; min-width: 22px; }
+    .rank-body { flex: 1; min-width: 0; }
+    .rank-name { color: var(--accent); font-weight: 600; }
+    .rank-msg { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rank-likes { color: var(--like); font-size: 13px; white-space: nowrap; }
+    .hidden { display: none !important; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .empty { color: #555; font-style: italic; padding: 28px 0; text-align: center; font-size: 14px; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .footer { margin-top: 32px; text-align: center; font-size: 12px; color: #444; }
+    .footer a { color: #555; text-decoration: none; }
+    .footer a:hover { color: var(--accent); }
+    details.debug { margin-top: 12px; }
+    details.debug summary { font-size: 11px; color: #444; cursor: pointer; user-select: none; }
+    details.debug summary:hover { color: #666; }
+    details.debug pre {
+      font-size: 11px; color: #555; background: #0d0d0d; padding: 8px;
+      border-radius: 6px; margin-top: 6px; white-space: pre-wrap; word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Guestbook</h1>
+    <p class="subtitle">
+      On-chain message board on Asentum testnet. Sign, read, and like — everything is permanent.
+    </p>
+  </header>
+
+  <!-- Wallet -->
+  <div class="card" id="wallet-section">
+    <div class="toolbar">
+      <span class="muted" id="wallet-info">Not connected</span>
+      <button id="btn-connect-ext" class="primary">Connect Wallet</button>
+    </div>
+    <details class="debug">
+      <summary>debug</summary>
+      <pre id="debug-log">waiting...</pre>
+    </details>
+  </div>
+
+  <!-- Sign form -->
+  <div class="card hidden" id="sign-section">
+    <h3>Sign the Guestbook</h3>
+    <input id="name-input" placeholder="Your name" maxlength="50" />
+    <textarea id="msg-input" placeholder="Message (max 280 characters)" maxlength="280"></textarea>
+    <div class="toolbar">
+      <button id="btn-sign" class="primary">Sign</button>
+      <span class="status" id="status"></span>
+    </div>
+  </div>
+
+  <!-- Entries -->
+  <div class="card">
+    <div class="tabs">
+      <button class="tab on" data-tab="recent">Recent</button>
+      <button class="tab" data-tab="top">Top Liked</button>
+    </div>
+    <div class="toolbar">
+      <span class="muted" id="count">Loading…</span>
+      <button id="btn-refresh" class="ghost">Refresh</button>
+    </div>
+    <div id="entries"></div>
+    <div id="top-entries" class="hidden"></div>
+  </div>
+
+  <p class="footer">
+    Contract <code id="contract-display"></code> ·
+    <a href="https://explorer.asentum.com" target="_blank">explorer.asentum.com</a>
+  </p>
+
+  <script type="module">
+    // ─── Configuration ───
+    const RPC = 'https://testnet.asentum.com';
+    const CONTRACT_ADDR = 'ase1f7mkunhejpq3aj0y9pdmvra7z739mre8c0q7sl';
+
+    document.getElementById('contract-display').textContent = CONTRACT_ADDR.slice(0, 14) + '…' + CONTRACT_ADDR.slice(-6);
+
+    // ─── Debug ───
+    const debugEl = document.getElementById('debug-log');
+    function debug(msg) {
+      console.log('[DEBUG]', msg);
+      debugEl.textContent = 'Debug: ' + msg;
+    }
+
+    // ─── State ───
+    let extProvider = null;
+    let extAddress = null;
+    let currentTab = 'recent';
+
+    // ─── Helpers ───
+    function setStatus(msg, type = 'info') {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = 'status ' + type;
+    }
+
+    function shortAddr(addr) {
+      if (!addr) return '?';
+      const s = String(addr);
+      return s.slice(0, 10) + '…' + s.slice(-4);
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = String(str);
+      return div.innerHTML;
+    }
+
+    // ─── RPC ───
+    async function viewCall(method, args = []) {
+      const res = await fetch(`${RPC}/view`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contract: CONTRACT_ADDR, method, args }),
+      });
+      if (!res.ok) throw new Error(`view ${method} failed: ${res.status}`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(`view ${method} failed: ${data.reason || 'unknown'}`);
+      return data.returnValue;
+    }
+
+    async function waitReceipt(txHash, timeoutMs = 30000) {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        try {
+          const res = await fetch(`${RPC}/receipts/${txHash}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.blockNumber) return data;
+          }
+        } catch (e) { /* retry */ }
+        await new Promise(r => setTimeout(r, 900));
+      }
+      throw new Error('Transaction not confirmed within timeout');
+    }
+
+    // ─── Connect ───
+    document.getElementById('btn-connect-ext').onclick = async () => {
+      if (!window.asentum) {
+        setStatus('Asentum Wallet extension not found.', 'err');
+        return;
+      }
+      try {
+        const result = await window.asentum.connect();
+        const addr = result.address || await window.asentum.getAddress();
+        extProvider = window.asentum;
+        extAddress = addr;
+        document.getElementById('wallet-info').textContent = 'Connected: ' + addr;
+        document.getElementById('sign-section').classList.remove('hidden');
+        setStatus('Connected. Sign or like an entry.', 'ok');
+        debug('Connected: ' + addr);
+        loadEntries();
+      } catch (err) {
+        debug('Connect error: ' + err.message);
+        setStatus('Connect failed: ' + err.message, 'err');
+      }
+    };
+
+    // ─── Render ───
+    function renderEntry(e) {
+      return `
+        <div class="entry">
+          <div class="entry-top">
+            <div class="entry-id">
+              <span class="entry-name">${escapeHtml(e.name)}</span>
+              <span class="entry-signer">${shortAddr(e.signer)}</span>
+            </div>
+            <button class="like" data-id="${e.id}">&#10084; ${e.likes || 0}</button>
+          </div>
+          <div class="entry-msg">${escapeHtml(e.message)}</div>
+          <div class="entry-meta">#${e.id} &middot; block ${e.block}</div>
+        </div>
+      `;
+    }
+
+    async function loadEntries() {
+      try {
+        const count = await viewCall('getCount', []);
+        document.getElementById('count').textContent =
+          count + ' entr' + (count === 1 || count === '1' ? 'y' : 'ies');
+
+        const entries = await viewCall('getEntries', []);
+        const container = document.getElementById('entries');
+
+        if (!entries || entries.length === 0) {
+          container.innerHTML = '<p class="empty">No entries yet. Be the first!</p>';
+          return;
+        }
+
+        container.innerHTML = [...entries].reverse().map(renderEntry).join('');
+
+        // Mark entries the connected wallet already liked
+        if (extAddress) {
+          for (const e of entries) {
+            try {
+              const liked = await viewCall('hasLiked', [e.id, extAddress]);
+              if (liked) {
+                const btn = container.querySelector(`.like[data-id="${e.id}"]`);
+                if (btn) btn.classList.add('on');
+              }
+            } catch (_) { /* non-fatal */ }
+          }
+        }
+      } catch (err) {
+        debug('Load error: ' + err.message);
+        document.getElementById('count').textContent = 'Error loading';
+        document.getElementById('entries').innerHTML =
+          `<p class="empty" style="color:#ff6b6b;">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    async function loadTopEntries() {
+      try {
+        const entries = await viewCall('getTopEntries', [5]);
+        const container = document.getElementById('top-entries');
+        if (!entries || entries.length === 0) {
+          container.innerHTML = '<p class="empty">No entries yet.</p>';
+          return;
+        }
+        container.innerHTML = entries.map((e, i) => `
+          <div class="rank-row">
+            <span class="rank-no">${i + 1}</span>
+            <div class="rank-body">
+              <span class="rank-name">${escapeHtml(e.name)}</span>
+              <div class="rank-msg">${escapeHtml(e.message)}</div>
+            </div>
+            <span class="rank-likes">&#10084; ${e.likes || 0}</span>
+          </div>
+        `).join('');
+      } catch (err) {
+        debug('Top load error: ' + err.message);
+      }
+    }
+
+    // ─── Like ───
+    async function handleLike(id, btn) {
+      if (!extProvider) {
+        setStatus('Connect wallet first to like.', 'err');
+        return;
+      }
+      btn.disabled = true;
+      setStatus('Liking entry #' + id + '…', 'info');
+      try {
+        const result = await extProvider.callContract({
+          to: CONTRACT_ADDR,
+          method: 'like',
+          args: [id],
+          value: '0',
+        });
+        debug('Like tx: ' + result.txHash);
+        const receipt = await waitReceipt(result.txHash);
+        if (receipt.success === false) {
+          throw new Error(receipt.error || 'Like failed');
+        }
+        setStatus('Liked! &#10084;', 'ok');
+        await loadEntries();
+        if (currentTab === 'top') await loadTopEntries();
+      } catch (err) {
+        debug('Like error: ' + err.message);
+        setStatus('Like failed: ' + err.message, 'err');
+        btn.disabled = false;
+      }
+    }
+
+    // ─── Sign ───
+    document.getElementById('btn-sign').onclick = async () => {
+      if (!extProvider) {
+        setStatus('Connect wallet first.', 'err');
+        return;
+      }
+      const name = document.getElementById('name-input').value.trim();
+      const message = document.getElementById('msg-input').value.trim();
+      if (!name) { setStatus('Enter your name.', 'err'); return; }
+      if (!message) { setStatus('Enter a message.', 'err'); return; }
+
+      const btn = document.getElementById('btn-sign');
+      btn.disabled = true;
+      setStatus('Signing…', 'info');
+
+      try {
+        const result = await extProvider.callContract({
+          to: CONTRACT_ADDR,
+          method: 'sign',
+          args: [name, message],
+          value: '0',
+        });
+        debug('Sign tx: ' + result.txHash);
+        setStatus('Tx submitted, waiting for block…', 'info');
+
+        const receipt = await waitReceipt(result.txHash);
+        debug('Receipt: ' + JSON.stringify(receipt));
+        if (receipt.success === false) {
+          throw new Error(receipt.error || 'Transaction reverted');
+        }
+        setStatus('Signed!', 'ok');
+        document.getElementById('msg-input').value = '';
+        await loadEntries();
+      } catch (err) {
+        debug('Sign error: ' + err.message);
+        setStatus('Sign failed: ' + err.message, 'err');
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    // ─── Tabs ───
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+        tab.classList.add('on');
+        currentTab = tab.dataset.tab;
+        const recent = document.getElementById('entries');
+        const top = document.getElementById('top-entries');
+        if (currentTab === 'recent') {
+          recent.classList.remove('hidden');
+          top.classList.add('hidden');
+        } else {
+          recent.classList.add('hidden');
+          top.classList.remove('hidden');
+          loadTopEntries();
+        }
+      };
+    });
+
+    // ─── Like button delegation ───
+    document.getElementById('entries').addEventListener('click', (e) => {
+      const btn = e.target.closest('.like');
+      if (btn) handleLike(btn.dataset.id, btn);
+    });
+
+    document.getElementById('btn-refresh').onclick = () => {
+      loadEntries();
+      if (currentTab === 'top') loadTopEntries();
+    };
+
+    // ─── Init ───
+    loadEntries();
+    setInterval(() => {
+      loadEntries();
+      if (currentTab === 'top') loadTopEntries();
+    }, 10000);
+  </script>
+</body>
+</html>
