@@ -19,9 +19,7 @@ Follow-up to my earlier `#devlog` post. I deployed a probe contract to establish
 
 **Correction 1 - I was wrong about timestamps.** I said there "appears to be no timestamp primitive at all." There is: `chain.blockTimestamp`, a BigInt in **milliseconds** (`1792442587086n`), not the seconds `msg.block.timestamp` implies. `chain.timestamp` - used in the developers page's own code sample - does not exist.
 
-**Correction 2 - the storage finding is worse than I described.** `storage.get()` does return a raw string, but the consequence is silent value corruption, not a type annoyance.
-
-**The `msg.block` finding stands.** `msg.block` is `undefined`; `msg.block.number` and `msg.block.timestamp` both throw.
+**Correction 2 - the storage finding is worse than I described.** `storage.get()` does return a raw string, but the consequence is silent value corruption, not a type annoyance. The `msg.block` finding stands: `msg.block` is `undefined`, and `msg.block.number` / `msg.block.timestamp` both throw.
 
 ### A. `storage` stringifies every value on write - BigInt arithmetic silently concatenates
 
@@ -93,22 +91,17 @@ If `chain.blockTimestamp` is the intended replacement for `msg.block.timestamp`,
 
 ### Docs vs runtime
 
-Absent at runtime despite being documented: `msg.block.number`, `msg.block.timestamp`, `chain.timestamp`, `cron`, `this.address`, `storage.entries()`. Present at runtime but undocumented: `chain` (blockNumber/blockTimestamp/chainId), `assert`, `storage.keys()`. Documented but different: objects -> `"[object Object]"`, BigInt -> string with `+` concatenating, contract shape -> object literal required.
+Absent at runtime despite being documented: `msg.block.number`, `msg.block.timestamp`, `chain.timestamp`, `cron`, `this.address`, `storage.entries()`. Present but undocumented: `chain` (blockNumber/blockTimestamp/chainId), `assert`, `storage.keys()`. Documented but different: objects -> `"[object Object]"`, BigInt -> string with `+` concatenating, contract shape -> object literal required.
 
-Four pages, four pictures of one API. The contract-shape issue from my original post still stands and blocks first-time developers hardest - neither documented format runs.
+The contract-shape issue from my original post still stands and blocks first-time developers hardest - neither documented format runs.
 
 ### Probe contract
 
 `ase18s2ka546638c7s0rhkhan5wy3q7x77a632f3ek` - source readable on-chain via `eth_getCode`, so this is independently verifiable without trusting the ticket. 8 free view methods, each returning a per-call `OK type=... value=...` / `ERR ...` map so one failure doesn't abort the rest: `probeChain`, `probeMsg`, `probeStorageRoundTrip`, `probeStorageEntries`, `probeThis`, `probeGlobals`, `probeAssertVsThrow`, `probeIteration`.
 
-```
-POST https://testnet.asentum.com/view
-{"contract":"ase18s2ka546638c7s0rhkhan5wy3q7x77a632f3ek","method":"probeStorageRoundTrip","args":[]}
-```
-
 ### Also filed on GitHub (SDK + explorer, not the VM)
 
-`asentum-network/asentum-connect` #3, #4, #5 and `asentum-network/asentum-explorer` #46, #47. Per the Security Best Practices page I have emailed `security@asentum.com` as well, and I'm happy to pull the public issues if you prefer them private.
+`asentum-connect` #3, #4, #5 and `asentum-explorer` #46, #47. I have emailed `security@asentum.com` as well and can pull the public issues if you prefer them private.
 
 ### Fix priority
 
