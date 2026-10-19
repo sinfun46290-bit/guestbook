@@ -1,7 +1,7 @@
 # Support ticket — runtime API ground truth
 
 **URL:** https://support.asentum.com/new  (sign in first — Google / Apple / Asentum wallet)
-**Character limit:** 6,000 on the "What" field. The body below is ~5,700.
+**Character limit:** 6,000 on the "What" field.
 
 **Field mapping**
 | Field | Value |
@@ -13,7 +13,7 @@
 
 ---
 
-## Body (copy from here — 5,700 chars)
+## Body (copy from here)
 
 Follow-up to my earlier `#devlog` post. I deployed a probe contract to establish ground truth for the APIs the docs disagree on. Two corrections, one upgraded severity, four new findings.
 
@@ -95,26 +95,13 @@ If `chain.blockTimestamp` is the intended replacement for `msg.block.timestamp`,
 
 ### F. `assert` and `throw` both work
 
-`assert(1===2,'assert fired')` → reverts "assert fired". `throw new Error('throw fired')` → reverts "throw fired". Minor: `assert('truthy','msg')` does **not** fire — the condition isn't coerced to boolean. Worth documenting.
+`assert(1===2,'assert fired')` reverts "assert fired"; `throw new Error('throw fired')` reverts "throw fired". Minor: `assert('truthy','msg')` does **not** fire — the condition isn't coerced to boolean. Worth documenting.
 
-### Docs vs runtime summary
+### Docs vs runtime
 
-| API | Writing Contracts | Hardened JS | Developers page | Runtime |
-|---|---|---|---|---|
-| `msg.block.number` | documented | documented | — | **undefined** |
-| `msg.block.timestamp` | documented | documented | — | **undefined** |
-| `chain.blockNumber` | — | — | documented | ✅ |
-| `chain.blockTimestamp` | — | — | documented | ✅ (ms) |
-| `chain.timestamp` | — | — | in sample | **undefined** |
-| `chain.chainId` | — | — | documented | ✅ |
-| `cron` | — | — | documented | **not a global** |
-| `this.address` | — | — | in sample | **undefined** |
-| `storage.entries()` | — | — | in sample | **not a function** |
-| `storage.keys()` | — | — | — | ✅ (undocumented) |
-| `assert` | — | — | documented | ✅ |
-| object round-trip | "nested objects" | — | in sample | **"[object Object]"** |
-| BigInt round-trip | "including BigInt" | "BigInt for balances" | — | **string; `+` concatenates** |
-| contract shape | top-level functions | — | — | **object literal required** |
+Documented but absent at runtime: `msg.block.number`, `msg.block.timestamp`, `chain.timestamp`, `cron`, `this.address`, `storage.entries()`.
+Present at runtime but undocumented: `chain` (blockNumber, blockTimestamp, chainId), `assert`, `storage.keys()`.
+Documented but behaves differently: object values → `"[object Object]"`; BigInt → string, and `+` concatenates; contract shape → object literal required, not top-level functions.
 
 Four pages, four different pictures of one API. The contract-shape issue from my original post still stands and blocks first-time developers hardest — neither documented format runs.
 
