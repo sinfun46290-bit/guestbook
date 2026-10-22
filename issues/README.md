@@ -4,9 +4,8 @@ Nine reproducible bugs were found while building the Guestbook dApp against the
 public testnet. Each one is severity-priced between +500 XP and +25,000 XP by the
 airdrop's "Feedback & Bugs" pillar, and paid when the patch ships.
 
-Bug 9 was found separately, auditing the AsePad web app while investigating
-the validator committee lottery — it is a frontend dead branch on the AsePad
-Create Token page.
+Bugs 9 and 10 were found separately while auditing the AsePad web app and the
+mainnet ASE staking contract.
 
 ## Where each one goes
 
@@ -18,6 +17,7 @@ Create Token page.
 | 7 | `asentum_getContractHash` documented, not implemented | **GitHub** → `asentum-network/asentum-explorer` | Explorer serves the JSON-RPC surface |
 | 8 | Explorer source does not match the displayed hash | **GitHub** → `asentum-network/asentum-explorer` | Explorer rendering/normalisation |
 | 9 | AsePad Create Token "Est. receive" always shows `0` | **GitHub** → `asentum-network/asentum-explorer` | AsePad frontend (same repo as #44) |
+| 10 | Mainnet ASE staking: `renounceOwnership()` can never succeed | **GitHub** → `asentum-network/asentum-explorer` | Contract behaviour vs ABI |
 | 1 | `msg.block.number` documented but undefined | **Telegram** + X DM | Chain runtime — no public core repo |
 | 2 | Both documented contract formats fail to run | **Telegram** + X DM | Chain runtime + IDE parser |
 | 3 | `storage.get()` returns the raw string | **Telegram** + X DM | Chain runtime semantics |
@@ -39,6 +39,7 @@ is the developer feedback loop.
 | `asentum-explorer-1-contract-hash-rpc.md` | Issue body — `asentum-explorer` |
 | `asentum-explorer-2-source-hash-mismatch.md` | Issue body — `asentum-explorer` |
 | `asentum-explorer-3-asepad-est-receive-zero.md` | Issue body — `asentum-explorer` (AsePad) |
+| `asentum-explorer-4-staking-renounce-impossible.md` | Issue body — `asentum-explorer` (mainnet staking) |
 | `runtime-telegram-post.md` | Telegram message (reports 1–3 in one post) |
 
 ## Submitted
@@ -51,6 +52,7 @@ is the developer feedback loop.
 | 7 | `asentum_getContractHash` missing | ✅ posted | https://github.com/asentum-network/asentum-explorer/issues/46 |
 | 8 | Source / hash normalisation | ✅ posted | https://github.com/asentum-network/asentum-explorer/issues/47 |
 | 9 | AsePad "Est. receive" always `0` | ⬜ **READY** — needs a GitHub PAT to auto-post, or paste manually | — |
+| 10 | Staking `renounceOwnership()` never succeeds | ⬜ **READY** — needs a GitHub PAT to auto-post, or paste manually | — |
 | 1 | `msg.block.number` undefined | ⬜ **TODO** — Telegram (`t.me/asentum`) + X DM @jst_Smiles | — |
 | 2 | Both documented contract formats fail | ⬜ **TODO** — Telegram + X DM | — |
 | 3 | `storage.get()` returns raw string | ⬜ **TODO** — Telegram + X DM | — |
